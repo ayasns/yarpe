@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 2.7
-      uses: actions/setup-python@v6.0.0
+      uses: MatteoH2O1999/setup-python@v6
       with:
         python-version: "2.7"
     - name: Pickle the save
