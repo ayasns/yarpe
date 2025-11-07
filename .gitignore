@@ -7,7 +7,7 @@ renpy-7.4.0-sdk
 .vscode
 games
 rp-osx
-/.DS_Store
+.DS_Store
 __pycache__
 /gadgets
 saves
