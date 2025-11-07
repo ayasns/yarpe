@@ -1206,6 +1206,7 @@ def poc():
     else:
         sc.send_notification("Listening on %s:%d for stage 2 payload..." % (ip, port))
     while True:
+        print("Waiting for client connection...")
         client_sock = u64_to_i64(
             sc.syscalls.accept(
                 s,
@@ -1225,29 +1226,30 @@ def poc():
 
         print("Client connected on socket %d" % client_sock)
 
-        read_size = u64_to_i64(
-            sc.syscalls.read(
-                client_sock,
-                refbytes(STAGE2_BUF),
-                STAGE2_MAX_SIZE,
-            )
-        )
-        if read_size < 0:
-            raise SocketError(
-                "read failed with return value %d, error %d\n%s"
-                % (
-                    read_size,
-                    sc.syscalls.read.errno,
-                    sc.syscalls.read.get_error_string(),
+        read_size = -1
+        stage2_str = ""
+        while read_size != 0:
+            read_size = u64_to_i64(
+                sc.syscalls.read(
+                    client_sock,
+                    refbytes(STAGE2_BUF),
+                    STAGE2_MAX_SIZE,
                 )
             )
+            stage2_str += STAGE2_BUF[:read_size].decode("utf-8")
+            if read_size < 0:
+                raise SocketError(
+                    "read failed with return value %d, error %d\n%s"
+                    % (
+                        read_size,
+                        sc.syscalls.read.errno,
+                        sc.syscalls.read.get_error_string(),
+                    )
+                )
 
         print("Received stage 2 payload, executing...")
 
         sc.syscalls.close(client_sock)  # close client socket
-
-        # Trim
-        stage2_str = STAGE2_BUF[:read_size].decode("utf-8")
 
         # Execute stage 2, mimic file-exec by throwing local/global in same scope
         scope = dict(locals(), **globals())
