@@ -656,9 +656,9 @@ class ROPChain(object):
 
 
 class Executable(object):
-    def __init__(self, sc):
+    def __init__(self, sc, size=0x2000 if CONSOLE_KIND == "PS4" else 0xF000):
         self.sc = sc
-        self.chain = ROPChain(sc)
+        self.chain = ROPChain(sc, size)
 
         CONTEXT_SZ = 0x210
 
