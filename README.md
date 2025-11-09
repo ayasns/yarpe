@@ -142,8 +142,8 @@ Thanks https://github.com/shahrilnet/remote_lua_loader/blob/main/SETUP.md for th
     - `executable.setup_post_chain()`: Sets up the post chain for execution.
     - `executable.setup_back_chain()`: Sets up the back chain for execution.
     - `executable.execute()`: Executes the code in the executable memory region.
-- `Structure(structure_dict)`: Creates a structure definition from `structure_dict`.
-    - `structure_dict[field_name] = size_in_bytes`
+- `Structure(structure_pair)`: Creates a structure definition from `structure_pair`.
+    - `structure_pair = [(field_name1, field_size1), (field_name2, field_size2), ...]`
     - `structure.size`: Total size of the structure in bytes.
     - `structure.offsets`: A dictionary mapping field names to their offsets in the structure.
     - `structure.create(defaults=None)`: Creates an instance of the structure with optional defaults(`defaults[field] = value`).

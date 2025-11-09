@@ -519,7 +519,7 @@ def getmem():
 def convert_regs_to_int(*regs):
     int_regs = []
     for r in regs:
-        if isinstance(r, (bytearray, str, unicode)):
+        if isinstance(r, (bytearray, str, unicode, StructureInstance)):
             int_regs.append(get_ref_addr(r))
         else:
             int_regs.append(r)
@@ -864,13 +864,15 @@ class SyscallContainer(object):
 
 class Structure(object):
     def __init__(self, sizes):
-        self.sizes = sizes
+        self._sizes = sizes
+        self.sizes = {}
         self.calculate()
 
     def calculate(self):
         self.size = 0
         self.offsets = {}
-        for field_name, field_size in self.sizes.items():
+        for field_name, field_size in self._sizes:
+            self.sizes[field_name] = field_size
             self.offsets[field_name] = self.size
             self.size += field_size
 
@@ -904,6 +906,7 @@ class StructureInstance(object):
     def __init__(self, structure, defaults=None):
         self.structure = structure
         self.buf = alloc(self.structure.size)
+        self.size = self.structure.size
         if defaults:
             for key, value in defaults.items():
                 self.set_field(key, value)
@@ -917,8 +920,10 @@ class StructureInstance(object):
 
     def set_field_raw(self, field_name, data):
         offset = self.structure.offsets[field_name]
-        field_size = self.structure.sizes[field_name]
-        self.buf[offset : offset + field_size] = data
+        data_len = len(data)
+        if data_len > self.structure.sizes[field_name]:
+            raise Exception("Data size exceeds field size")
+        self.buf[offset : offset + data_len] = data
 
     def set_field(self, field_name, value):
         offset = self.structure.offsets[field_name]
@@ -972,7 +977,7 @@ class StructureInstance(object):
             raise KeyError("No such field: %s" % key)
 
     def __setattr__(self, name, value):
-        if name in ("structure", "buf"):
+        if name in ("structure", "buf", "size"):
             object.__setattr__(self, name, value)
         elif name in self.structure.offsets:
             self.set_field(name, value)
@@ -980,7 +985,7 @@ class StructureInstance(object):
             raise AttributeError("No such field: %s" % name)
 
     def __getattr__(self, name):
-        if name in ("structure", "buf"):
+        if name in ("structure", "buf", "size"):
             return object.__getattribute__(self, name)
         elif name in self.structure.offsets:
             return self.get_field(name)
@@ -1019,9 +1024,6 @@ class SploitCore(object):
         self._prepare_syscall()
 
     def _prepare_syscall(self):
-        INIT_PROC_ADDR_OFFSET = 0x128
-        SEGMENTS_OFFSET = 0x160
-
         gettimeofday_in_libkernel = readuint(
             self.libc_addr + SELECTED_LIBC["gettimeofday"], 8
         )
@@ -1030,8 +1032,15 @@ class SploitCore(object):
         # eh why not
         self.make_function_if_needed("gettimeofday", gettimeofday_in_libkernel)
 
-        mod_info = bytes([b"\0"] * 0x300)
-        nogc.append(mod_info)
+        mod_info = Structure(
+            [
+                ("unknown1", 0x128),
+                ("init_proc_addr", 8),
+                ("unknown2", 0x30),
+                ("segments", 8),
+                ("unknown3", 0x198),
+            ],
+        ).create()
 
         sceKernelGetModuleInfoFromAddr_addr = readuint(
             self.libc_addr + SELECTED_LIBC["sceKernelGetModuleInfoFromAddr"], 8
@@ -1047,13 +1056,9 @@ class SploitCore(object):
         if ret != 0:
             raise Exception("sceKernelGetModuleInfoFromAddr failed: 0x%x" % ret)
 
-        self.libkernel_addr = struct.unpack(
-            "<Q", mod_info[SEGMENTS_OFFSET : SEGMENTS_OFFSET + 8]
-        )[0]
+        self.libkernel_addr = mod_info.segments
         print("[*] libkernel base address: 0x%x" % self.libkernel_addr)
-        init_proc_addr = struct.unpack(
-            "<Q", mod_info[INIT_PROC_ADDR_OFFSET : INIT_PROC_ADDR_OFFSET + 8]
-        )[0]
+        init_proc_addr = mod_info.init_proc_addr
         delta = self.libkernel_addr - init_proc_addr
 
         if delta == 0:
@@ -1119,20 +1124,29 @@ class SploitCore(object):
 
     def send_notification(self, msg):
         icon_uri = b"cxml://psnotification/tex_icon_system"
-        notify_buf = bytearray(0xC30)
-        nogc.append(notify_buf)
+        # notify_buf = bytearray(0xC30)
+        notify_buf = Structure(
+            [
+                ("unknown1", 0x10),
+                ("target_id", 4),
+                ("unknown2", 0x18),
+                ("use_icon_image_url", 1),
+                ("message", 0x400),
+                ("icon_uri", 0x400),
+                ("padding", 0x403),
+            ]
+        ).create()
 
-        notify_buf[0x2C : 0x2C + 4] = bytes(p32a(0x10))  # use_icon_image_url
-        notify_buf[0x10 : 0x10 + 4] = bytes(p32a(0xFFFFFFFF))  # target_id
+        notify_buf.target_id = 0xFFFFFFFF  # broadcast to all users
+        notify_buf.use_icon_image_url = 0x10
 
         msg_bytes = msg.encode("utf-8")
-        notify_buf[0x2D : 0x2D + len(msg_bytes)] = msg_bytes
-        notify_buf[0x42D : 0x42D + len(icon_uri)] = icon_uri
+        notify_buf.set_field_raw("message", msg_bytes)
+        notify_buf.set_field_raw("icon_uri", icon_uri)
 
         dev_path = b"/dev/notification0\0"
-        nogc.append(dev_path)
         fd = self.syscalls.open(
-            refbytes(dev_path),
+            dev_path,
             O_WRONLY,
         )
         if fd < 0:
@@ -1141,8 +1155,8 @@ class SploitCore(object):
 
         self.syscalls.write(
             fd,
-            refbytearray(notify_buf),
-            len(notify_buf),
+            notify_buf,
+            notify_buf.size,
         )
         self.syscalls.close(
             fd,
@@ -1262,21 +1276,35 @@ class SploitCore(object):
         return True
 
 
-sockaddr_in = bytearray(b"\0" * 16)
-nogc.append(sockaddr_in)
-enable_buf = bytearray(b"\0" * 4)
-nogc.append(enable_buf)
+sockaddr_in = Structure(
+    [
+        ("sin_len", 1),
+        ("sin_family", 1),
+        ("sin_port", 2),
+        ("sin_addr", 4),
+        ("sin_zero", 8),
+    ]
+).create()
+enable_buf = Structure(
+    [
+        ("enable", 4),
+    ]
+).create()
 
 
 SHARED_VARS = {}
 
 
 def create_tcp_socket(sc):
-    enable_buf[0:4] = struct.pack("<I", 1)  # enable option
-    sockaddr_in[0:16] = b"\0" * 16
-    sockaddr_in[1:2] = b"\x02"  # sin_family, AF_INET
-    sockaddr_in[2:4] = struct.pack(">H", PORT)  # sin_port
-    sockaddr_in[4:8] = struct.pack(">I", 0)  # sin_addr
+    enable_buf.enable = 1
+    # sockaddr_in[0:16] = b"\0" * 16
+    # sockaddr_in[1:2] = b"\x02"  # sin_family, AF_INET
+    # sockaddr_in[2:4] = struct.pack(">H", PORT)  # sin_port
+    # sockaddr_in[4:8] = struct.pack(">I", 0)  # sin_addr
+    sockaddr_in.reset()
+    sockaddr_in.sin_family = AF_INET
+    sockaddr_in.sin_port = struct.unpack(">H", struct.pack("<H", PORT))[0]
+    sockaddr_in.sin_addr = struct.unpack("<I", struct.pack(">I", 0))[0]  # INADDR_ANY
 
     s = u64_to_i64(sc.syscalls.socket(AF_INET, SOCK_STREAM))
     print("[*] Created TCP socket: %d" % s)
@@ -1290,7 +1318,7 @@ def create_tcp_socket(sc):
         s,
         SOL_SOCKET,
         SO_REUSEADDR,
-        refbytearray(enable_buf),
+        enable_buf,
         4,
     )
     print("[*] Set socket options: %d" % s)
@@ -1323,16 +1351,20 @@ def poc():
 
     s = None
     port = None
-    len_buf = bytearray(b"\0" * 8)
+    len_buf = Structure(
+        [
+            ("len", 4),
+        ]
+    ).create()
     print("[*] Creating TCP socket...")
     s = create_tcp_socket(sc)
 
     sc.syscalls.getsockname(
         s,
-        refbytearray(sockaddr_in),
-        refbytearray(len_buf),
+        sockaddr_in,
+        len_buf,
     )
-    port = struct.unpack(">H", sockaddr_in[2:4])[0]
+    port = struct.unpack(">H", struct.pack("<H", sockaddr_in.sin_port))[0]
 
     ip = sc.get_current_ip()
 
@@ -1345,8 +1377,8 @@ def poc():
         client_sock = u64_to_i64(
             sc.syscalls.accept(
                 s,
-                refbytearray(sockaddr_in),
-                refbytearray(len_buf),
+                sockaddr_in,
+                len_buf,
             )
         )
         if client_sock < 0:
@@ -1367,7 +1399,7 @@ def poc():
             read_size = u64_to_i64(
                 sc.syscalls.read(
                     client_sock,
-                    refbytes(STAGE2_BUF),
+                    STAGE2_BUF,
                     STAGE2_MAX_SIZE,
                 )
             )
