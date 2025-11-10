@@ -2,6 +2,7 @@ import zipfile
 import io
 import re
 import os
+import struct
 
 WRITING = False
 
@@ -196,33 +197,50 @@ while read_size != 0:
 print("Received save.zip, size %d bytes" % len(update_file))
 sc.syscalls.close(client_sock)
 
+
 # the game changes path like `foo/bar/baz` to `_foo__bar_baz`
 # since the zip already has converted name, we need to reverse that
-
-
 def filename_converter(name):
     pattern = re.compile(r"_([a-zA-Z0-9]+)_")
     paths = pattern.split(name)
     return "/".join(paths)
 
 
+def save_index_parser(data):
+    files = {}
+    count = struct.unpack("<I", data[0:4])[0]
+    offset = 4
+    for _ in range(count):
+        skip = struct.unpack("<Q", data[offset : offset + 8])[0]
+        offset += 8
+        name_len = struct.unpack("<I", data[offset : offset + 4])[0]
+        offset += 4
+        name = data[offset : offset + name_len].decode("utf-8")
+        offset += name_len + 1  # null terminator
+        split_path = name[7:].split("/")  # remove leading /saves/
+        files[
+            "".join(
+                [
+                    ("_%s_" % x) if i != len(split_path) - 1 else x
+                    for i, x in enumerate(split_path)
+                ]
+            )
+        ] = name
+
+    return files
+
+
 with zipfile.ZipFile(io.BytesIO(update_file), "r") as zipf:
+    save_index = save_index_parser(zipf.read("-saveindex"))
     for fileinfo in zipf.infolist():
         if fileinfo.filename == "-saveindex":
             continue
-        new_name = filename_converter(fileinfo.filename)
-        if len(new_name.split("/")[1:]) != 0:
-            paths = new_name.split("/")[1:-1]
-            curr_path = "/saves"
-            for path in paths:
-                curr_path += "/" + path
-                if not os.path.exists(curr_path):
-                    os.mkdir(curr_path)
-        new_name = new_name if new_name.startswith("/") else "/" + new_name
-        print("Extracting %s (%d bytes)" % (new_name, fileinfo.file_size))
-        filedata = zipf.read(fileinfo.filename)
-        with open("/saves" + new_name, "wb") as f:
-            f.write(filedata)
+        new_path = save_index.get(fileinfo.filename, fileinfo.filename)
+        print("Extracting %s (%d bytes)" % (new_path, fileinfo.file_size))
+        if not os.path.exists(os.path.dirname(new_path)):
+            os.makedirs(os.path.dirname(new_path))
+        with open(new_path, "wb") as f:
+            f.write(zipf.read(fileinfo.filename))
 
 print("Successfully updated save files.")
 print("Press X(or O) to exit the game.{w}")
