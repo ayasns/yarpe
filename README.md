@@ -239,7 +239,7 @@ Thanks https://github.com/shahrilnet/remote_lua_loader/blob/main/SETUP.md for th
         - Example: `SYSCALL[syscall_name] = number`
     - `nogc`: A list that holds references to objects that should not be garbage collected.
     - `rp`: `renpy` variable that can be used to access Ren'Py functions.
-- `SHARED_VARS`: A dictionary that can be used to share data between multiple payloads.
+    - `SHARED_VARS`: A dictionary that can be used to share data between multiple payloads.
 
 ## Credits
 - [@DrYenyen](https://github.com/DrYenyen) - Testing with me

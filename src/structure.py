@@ -96,15 +96,14 @@ class StructureInstance(object):
         offset = self.structure.offsets[field_name]
         size = self.structure.sizes[field_name]
         data = self.buf[offset : offset + size]
-        if size in [1, 2, 4, 8]:
-            if size == 1:
-                return struct.unpack("<B", data)[0]
-            elif size == 2:
-                return struct.unpack("<H", data)[0]
-            elif size == 4:
-                return struct.unpack("<I", data)[0]
-            elif size == 8:
-                return struct.unpack("<Q", data)[0]
+        if size == 1:
+            return struct.unpack("<B", data)[0]
+        elif size == 2:
+            return struct.unpack("<H", data)[0]
+        elif size == 4:
+            return struct.unpack("<I", data)[0]
+        elif size == 8:
+            return struct.unpack("<Q", data)[0]
         else:
             return data
 
