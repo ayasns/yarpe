@@ -53,7 +53,7 @@ class Syscall(Executable):
 
     def get_error_string(self):
         errstr_addr = self.sc.functions.strerror(self.errno)
-        errstr = get_cstring(self.sc.mem, errstr_addr)
+        errstr = get_cstring(self.sc.mem, errstr_addr - 0x1000)
         return errstr
 
 
