@@ -24,15 +24,20 @@ SYSCALL = {
     "write": 4,
     "open": 5,
     "close": 6,
+    "getpid": 20,
+    "getuid": 24,
     "accept": 30,
+    "getsockname": 32,
+    "kill": 37,
     "pipe": 42,
     "socket": 97,
     "bind": 104,
     "setsockopt": 105,
     "listen": 106,
-    "getsockname": 118,
     "netgetiflist": 125,
+    "stat": 188,
     "sysctl": 202,
+    "is_in_sandbox": 585,
 }
 
 SHARED_VARS = {}
