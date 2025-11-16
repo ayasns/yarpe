@@ -40,13 +40,27 @@ def list_files(start_path):
     return all_files
 
 
-def scan_saves_directory():
+def scan_src_directory():
     files = []
     PREFIX = "./src"
 
     for filename in list_files(PREFIX):
         mod_time = int(os.path.getmtime(filename))
         rel_path = "/saves/yarpe/" + filename[len(PREFIX) + 1 :]
+
+        files.append((rel_path, mod_time))
+
+    files.sort(key=lambda x: x[0])
+    return files
+
+
+def scan_yarpe_autoload_directory():
+    files = []
+    PREFIX = "./yarpe_autoload"
+
+    for filename in list_files(PREFIX):
+        mod_time = int(os.path.getmtime(filename))
+        rel_path = "/saves/yarpe_autoload/" + filename[len(PREFIX) + 1 :]
 
         files.append((rel_path, mod_time))
 
@@ -80,23 +94,24 @@ def main():
         zip.write("savegame_container/log", "log")
         zip.write("savegame_container/renpy_version", "renpy_version")
         zip.write("savegame_container/screenshot.png", "screenshot.png")
-    files = scan_saves_directory()
+    src_files = scan_src_directory()
+    autoload_files = scan_yarpe_autoload_directory()
 
-    if not files:
+    if not src_files:
         print("No files found to index!")
         return
 
-    files.append(("/saves/1-1-LT1.save", int(os.path.getmtime("1-1-LT1.save"))))
-    files.append(("/saves/persistent", 0))
+    src_files.append(("/saves/1-1-LT1.save", int(os.path.getmtime("1-1-LT1.save"))))
+    src_files.append(("/saves/persistent", 0))
 
     output_path = "-saveindex"
-    create_saveindex(files, output_path)
+    create_saveindex(src_files + autoload_files, output_path)
 
     with zipfile.ZipFile("save.zip", "w") as zipf:
         zipf.write(output_path, "-saveindex")
         zipf.write("1-1-LT1.save", "1-1-LT1.save")
         # zipf.write("persistent", "persistent")
-        for filepath, _ in files:
+        for filepath, _ in src_files:
             if filepath in ["/saves/1-1-LT1.save", "/saves/persistent"]:
                 continue
 
@@ -108,6 +123,17 @@ def main():
                 ]
             )
             local_path = "src/" + filepath[7:][len("yarpe/") :]
+            zipf.write(local_path, zip_path)
+
+        for filepath, _ in autoload_files:
+            split_path = filepath[7:].split("/")
+            zip_path = "".join(
+                [
+                    ("_%s_" % x) if i != len(split_path) - 1 else x
+                    for i, x in enumerate(split_path)
+                ]
+            )
+            local_path = filepath[7:]
             zipf.write(local_path, zip_path)
 
 

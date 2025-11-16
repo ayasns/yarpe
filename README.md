@@ -137,6 +137,23 @@ Thanks https://github.com/shahrilnet/remote_lua_loader/blob/main/SETUP.md for th
     - `utils.rp`: Logging to screen using Ren'Py functions.
         - `utils.rp.log(*args)`: Logs `args` to screen.
         - `utils.rp.log_exc(string)`: Logs the `string` as an exception to screen.
+    - `utils.tcp`: TCP socket functions.
+        - `utils.tcp.ip_to_int(ip_string)`: Converts `ip_string` to integer.
+        - `utils.tcp.htonl(value)`: Converts `value` to network byte order.
+        - `utils.tcp.create_tcp_socket()`: Creates a TCP socket and returns its file descriptor.
+        - `utils.tcp.get_socket_name(socket_fd)`: Gets the socket ip and port of `socket_fd`.
+        - `utils.tcp.create_tcp_server(port, ip='0.0.0.0')`: Creates a TCP server listening on `ip:port` and returns its file descriptor and sockaddr_in struct.
+        - `utils.tcp.create_tcp_client(ip, port)`: Creates a TCP client connected to `ip:port` and returns its file descriptor.
+        - `utils.tcp.accept_client(socket_fd)`: Accepts a client connection on `socket_fd` and returns the client socket fd and sockaddr_in struct.
+        - `utils.tcp.read_from_socket(socket_fd, size=4096)`: Reads up to `size` bytes from `socket_fd` and returns the data.
+        - `utils.tcp.read_all_from_socket(socket_fd)`: Reads all available data from `socket_fd` until no more data is available and returns the data.
+        - `utils.tcp.write_to_socket(socket_fd, data)`: Writes `data` to `socket_fd`.
+        - `utils.tcp.close_socket(socket_fd)`: Closes the socket `socket_fd`.
+    - `utils.fs`: File system functions.
+        - `utils.fs.stat_file(path)`: Gets the [stat struct](https://github.com/freebsd/freebsd-src/blob/b0973980cd24ba188c83fbba2410ddb8ed6546e2/sys/sys/stat.h#L122) of the file at `path`.
+        - `utils.fs.file_exists(path)`: Returns whether the file at `path` exists.
+        - `utils.fs.read_file_data(path)`: Reads the file at `path` and returns its data.
+        - `utils.fs.write_file_data(path, data)`: Writes `data` to the file at `path`.
 - `sc.sc`: SploitCore instance
     - I will shorten `sc.sc` to `sc` for easier reading.
     - `sc.mem`: bytearray representing the game's memory.
@@ -151,11 +168,13 @@ Thanks https://github.com/shahrilnet/remote_lua_loader/blob/main/SETUP.md for th
     - `sc.platform`: The console platform(does not depend on game edition) (e.g., 'ps4', 'ps5').
         - Do note that these are in lowercase.
     - `sc.version`: The console firmware version (e.g., '9.00', '10.03').
+    - `sc.is_jailbroken`: Returns whether the console is jailbroken.
     - `sc.make_function_if_needed(name, addr)`: Creates a function entry in `sc.functions` if it does not already exist, and returns it.
     - `sc.make_syscall_if_needed(name, num)`: Creates a syscall entry in `sc.syscalls` if it does not already exist, and returns it.
     - `sc.send_notification(message)`: Sends a notification to the PS4/PS5.
     - `sc.get_sysctl_int(name)`: Gets the integer value of the sysctl variable `name`.
     - `sc.set_sysctl_int(name, value)`: Sets the integer value of the sysctl variable `name` to `value`.
+    - `sc.kill_game()`: Kills the current game process.
 - `ropchain`: ROPChain module
     - `ropchain.ROPChain(sc, size=variable_per_console)`: Creates a ROP chain builder.
         - `chain.chain`: The bytearray representing the ROP chain.
