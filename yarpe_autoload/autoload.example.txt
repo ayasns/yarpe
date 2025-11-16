@@ -1,5 +1,6 @@
 # This is an autoload file for yarpe
 # Rename this file to autoload.txt and place it in the yarpe_autoload directory
+# You can also use your USB drive's yarpe_autoload directory
 
 # Type file path here and yarpe will automatically run the script/elf/bin
 # Example: lapse.py
