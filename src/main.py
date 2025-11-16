@@ -30,10 +30,8 @@ PORT = 9025
 
 
 def poc():
-    log(
-        "[*] Detected game console variant: %s, game name: %s, console: %s"
-        % (CONSOLE_KIND, rp.config.name, sc.platform)
-    )
+    log("[*] Detected game: %s %s" % (rp.config.name, CONSOLE_KIND))
+    log("[*] Console: %s %s" % (sc.platform.upper(), sc.version))
 
     AUTO_LOAD_PATHS = []
     for i in range(8):
@@ -105,15 +103,30 @@ def poc():
                         else:
                             exec_data = read_file_data(exec_path)
                         log(
-                            "[*] Executing autoload binary(assumes elfldr is running and listening on port 9021): %s"
+                            "[*] Executing autoload binary(assumes loader is already executed): %s"
                             % exec_path
                         )
-                        sock = create_tcp_client("127.0.0.1", 9021)
-                        write_to_socket(sock, exec_data)
-                        close_socket(sock)
                         if sc.platform == "ps5":
+                            sock = create_tcp_client("127.0.0.1", 9021)
+                            write_to_socket(sock, exec_data)
+                            close_socket(sock)
                             log("[*] Killing game to allow elfldr to take over...")
                             sc.kill_game()
+                        else:
+                            BinLoader = SHARED_VARS.get("BinLoader", None)
+                            if BinLoader is None:
+                                log(
+                                    "[!] BinLoader not found in SHARED_VARS, cannot execute binary: %s"
+                                    % exec_path
+                                )
+                            else:
+                                loader = BinLoader(exec_data)
+                                loader.run()
+                                loader.join()
+                                log(
+                                    "[*] Autoload binary executed successfully: %s"
+                                    % exec_path
+                                )
                     else:
                         log("[*] Unknown file detected, ignoring...")
         except:

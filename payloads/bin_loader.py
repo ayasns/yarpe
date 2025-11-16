@@ -1,8 +1,5 @@
 import math
 import struct
-import os
-import pygame_sdl2
-from pygame_sdl2 import CONTROLLER_BUTTON_A
 from structure import Structure
 from sc import sc
 from utils.conversion import u64_to_i64
@@ -17,7 +14,7 @@ from utils.tcp import (
     read_all_from_socket,
 )
 from utils.unsafe import readbuf, readuint, writebuf
-from constants import SYSCALL, LIBC_OFFSETS
+from constants import SYSCALL, LIBC_OFFSETS, SHARED_VARS
 
 
 # Port of https://github.com/shahrilnet/remote_lua_loader/blob/main/payloads/bin_loader.lua
@@ -29,11 +26,6 @@ LIBC_OFFSETS["Arcade Spirits: The New Challengers"]["PS4"]["Thrd_join"] = 0x4CF5
 
 SYSCALL["mmap"] = 477
 SYSCALL["munmap"] = 0x49
-
-c = pygame_sdl2.controller.Controller(0)
-c.init()
-FORCE_SOCKET = c.get_button(CONTROLLER_BUTTON_A) == 1
-c.quit()
 
 PORT = 9021
 
@@ -84,7 +76,7 @@ def read_elf_header(buf_addr):
 
 def load_elf_segment(buf_addr, base_addr):
     elf = read_elf_header(buf_addr)
-    for i in range(len(elf.e_phnum)):
+    for i in range(elf.e_phnum):
         segment_offset = elf.e_phoff + i * elf.e_phentsize
         segment = ELF_SEGMENT_STRUCT.from_address(buf_addr + segment_offset)
 
@@ -185,17 +177,11 @@ def main():
 
     payload_data = b""
 
-    if os.path.exists("/saves/yarpe/elfldr-ps4.elf") and not FORCE_SOCKET:
-        log("Found elfldr-ps4.elf in /saves/yarpe/. Loading from save...")
-        log(
-            "You can force network transfer by holding X button when launching the payload."
-        )
-        with open("/saves/yarpe/elfldr-ps4.elf", "rb") as f:
-            payload_data = f.read()
+    if SHARED_VARS.get("AUTO_LOAD", False):
+        SHARED_VARS["BinLoader"] = BinLoader
+        log("AUTO_LOAD is set, BinLoader class stored in SHARED_VARS.")
+        return
     else:
-        log(
-            "elfldr-ps4.elf not found in /saves/yarpe/ or X button pressed... Will wait for network transfer."
-        )
         s = None
         port = None
         log("[*] Creating TCP server...")
@@ -221,9 +207,9 @@ def main():
         close_socket(client_sock)
         close_socket(s)
 
-    bin = BinLoader(payload_data)
-    bin.run()
-    bin.join()
+        bin = BinLoader(payload_data)
+        bin.run()
+        bin.join()
 
 
 main()
