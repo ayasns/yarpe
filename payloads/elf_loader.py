@@ -196,6 +196,12 @@ def run_with_ps5_syscall_enabled(func):
         # restore back
         kernel.write_dword(cur_sysent, cur_table_size)
         kernel.write_qword(cur_sysent + 0x8, cur_table)
+    else:
+        # we can already use ps5 syscalls directly
+        try:
+            func()
+        except:
+            log_exc(traceback.format_exc())
 
 
 class ElfLoader:
